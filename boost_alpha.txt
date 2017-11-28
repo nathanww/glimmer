@@ -1,0 +1,6 @@
+//sampleLength=3
+//baselineLength=10
+//baselineMode=continuous
+var peakFreq=maxFreq(lastSample,7.5,13);
+var amplitude=1;
+var frequency=peakFreq;

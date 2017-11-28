@@ -1,0 +1,3 @@
+To run:
+Start Glimmer.exe from the application.windows32 folder
+
