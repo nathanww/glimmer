@@ -1,6 +1,6 @@
 # Glimmer--Brainwave entrainment and neurofeedback for Windows
 
-Glimmer is a program for visual brainwave entrainment. It works to induce neural oscillations at a specific frequency by modulating the brightness of your monotr at that frequency, an approach that has shown promising results in modulating [memory](https://www.biorxiv.org/content/biorxiv/early/2017/10/15/191189.full.pdf) and [attention](http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0143533) function, and [may be useful in reducing the buildup of Alzheimer's associated toxins in the brain](https://www.nature.com/articles/nature20587)
+Glimmer is a program for visual brainwave entrainment. It works to induce neural oscillations at a specific frequency by modulating the brightness of your monitor at that frequency, an approach that has shown promising results in modulating [memory](https://www.biorxiv.org/content/biorxiv/early/2017/10/15/191189.full.pdf) and [attention](http://journals.plos.org/plosone/article?id=10.1371/journal.pone.0143533) function, and [may be useful in reducing the buildup of Alzheimer's associated toxins in the brain](https://www.nature.com/articles/nature20587)
 
 Glimmer is designed to provide brainwave entrainment "in the background" while you use your computer for other things. It can also be used in experiments to test the effects of entrainment applied at the same time participants complete cognitive tasks.
 
