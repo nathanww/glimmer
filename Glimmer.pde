@@ -425,14 +425,15 @@ void draw() {
         text("Settings controlled by script",mouseX+15,mouseY);
       }
       
-     //draw the active zone
+     //draw the active zones
      fill(200,200,0,100);
      stroke(230,230,0,100);
-     rect(width-100,height-100,100,100);
+     rect(width-100,height-100,100,100); //bottom right
+     rect(0,0,20,20); 
      textFont(smallfont);
      fill(255);
      stroke(255);
-     text("You can pull up this screen\nby holding the mouse \nin the right bottom corner.",width-500,height-200);
+     text("You can pull up this screen\nby holding the mouse \nin the right bottom\nor top left corner.",width-500,height-200);
      
 
   }
@@ -504,7 +505,7 @@ lastCycleStart=millis();
   }
       }
   
-      if (mouseX > width-100 && mouseY > height-100) { //keep track of how long mouse has been in the corner to pull up settings
+      if (mouseX > width-100 && mouseY > height-100 || (mouseX <= 20 && mouseY <=20) ) { //keep track of how long mouse has been in one of the active zones to pull up settings
 
     }
       else {
