@@ -56,7 +56,7 @@ GlobalMouseHook mouseHook;
 boolean overTaskbar=false;
 int fakeRelease=0; //for some reason generating a mouse click requires multiple calls to Robot and that generates spurious release events. This is a counter of "fake" events.
 
-int startFlickerTime=millis();
+int startFlickerTime=0;
 
 float scriptAmplitude=0.5f; //scaling value for script amplitude commands(1=script runs at double amplitude, 0.5=100% amplitude)
 //are mouse buttons down?
@@ -108,7 +108,8 @@ boolean isVis=true;
 //script stuff
 ScriptEngineManager mgr = new ScriptEngineManager();
 ScriptEngine engine = mgr.getEngineByName("javascript");
-
+//timing for script
+int scriptStartTime=0;
 //buffers for raw data
 float[] lastSample;
 float[] sampleBuffer;
@@ -195,6 +196,7 @@ public void runScript(float[] baseline, float[] sample) { //run a user neuroffed
         try {
         engine.put("lastSample",sample);
         engine.put("baseline",baseline);
+        engine.put("runTime",millis()-scriptStartTime);
         engine.eval(jsfunctions+script);
         Double amp=(Double)engine.get("amplitude");
         amplitude=(amp.floatValue()*(scriptAmplitude*2));
@@ -640,7 +642,8 @@ if (hasScript) {
   String[] ports=serial.list();
   for (int port=0; port < ports.length; port++) {
     try {
-      eeg = new MindSet(this, "COM19");
+      eeg = new MindSet(this, "COM11");
+      scriptStartTime=millis();
       worked=true;
       logger = createWriter("log-"+year()+"-"+month()+"-"+day()+"-"+hour()+"-"+minute()+".txt"); 
       break;
