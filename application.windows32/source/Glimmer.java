@@ -59,6 +59,7 @@ public class Glimmer extends PApplet {
 OscP5 receiver; //for getting messages from openBCI
 boolean hasOpenBCI=false; //is an OpenBCI system sending us messages?
 int openBCIPointer=0; //pointer for the buffer
+int openBCIChannel=0; //openBCI channel we are listening to.
 float[] openBCIBuffer; //put the openBCI data in two-second batches so it is compatible with what we get from neurosky
 GlobalMouseHook mouseHook;
 boolean overTaskbar=false;
@@ -276,7 +277,7 @@ public void oscEvent(OscMessage message) { //called when we get an OSC message f
   eegConnected=true;
   if (hasScript) { //script is running
     if (openBCIPointer < 200) {
-      openBCIBuffer[openBCIPointer]=message.get(0).floatValue();
+      openBCIBuffer[openBCIPointer]=message.get(openBCIChannel).floatValue(); //we get four values, one for each channel, retrieve the value for the active channel.
       openBCIPointer++;
     }
     else {
@@ -519,7 +520,21 @@ public void draw() {
               if (hasOpenBCI) {
         textFont(font);
         fill(255);
-        text("OpenBCI connected\nReading channel 1",490,460);
+        text("Connected to OpenBCI, select channel",490,460);
+        //draw openBCI channel selection buttons
+        int startX=580;
+        for (int button=0; button < 4; button++) {
+          if (button == openBCIChannel) {
+            fill(0,160,0);
+          }
+          else {
+          noFill();
+          }
+          rect(startX,480,70,70);
+          fill(255);
+          text(""+(button+1),startX+20,540);
+          startX=startX+85;
+        }
       }
       
       if (scriptError) {
@@ -668,6 +683,17 @@ if (hasScript) {
      else {
      selectInput("Select the script file", "fileSelected");
      }
+ }
+ 
+ if (hasOpenBCI) { //openBCI channel settings are displayed on screen, handle them.
+        int startX=580;
+        for (int button=0; button < 4; button++) { //replicates how we set up the buttons. We first calculate the area corresponding to channel buttons 1-4, if the click was in that area we set the active channel accordingly
+          if (mouseX > startX && mouseX < startX+70 && mouseY >480 && mouseY < 550) {
+            openBCIChannel=button;
+          }
+          startX=startX+85;
+        }
+ 
  }
   }
   
