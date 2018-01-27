@@ -10,7 +10,26 @@ Glimmer can also provide neurofeedback and "closed-loop" entrainment (i.e. tunin
 
 You can start Glimmer by running glimmer.exe from the "application.windows32" folder. The full-screen configuration menu should open immediatley. Select the frequency and amplitude you want, and click start. You can call up the settings screen at any time by holding your mouse in the bottom right corner of the screen.
 
-If you want to use Glimmer with a Neurosky device, you will need to first (1) Pair the neurosky device with your computer, and (2) Acquire a script file that tells Glimmer how to process the EEG data (See the included scripting guide). Once both these components are in place, you can start the neurofeedback/closed loop mode using the "load script" button.
+### Neurofeedback and EEG 
+Glimmer can use data from Mindwave Mobile and OpenBCI devices to provide neurofeedback and customize stimulation.
+
+To use these features, you will need to acquire or write a script file that tells Glimmer how to process the EEG data (see the scripting guide), and then connect your EEG device and run the script.
+##### Using an OpenBCI device
+1. Connect the device to your computer and start the OpenBCI GUI.
+2. Start the data stream
+3. In the "networking" panel, set protocol to OSC, data type to "Time series", IP to 127.0.0.1, port to 12345, and address to /openbci. Click start.
+4. Start Glimmer. It should say "EEG connected".
+5. In Glimmer, select which OpenBCI channel you want to use for data (Glimmer only monitors one channel at a time)
+6. Click "load script" and select your script file. The script will start automatically.
+
+You can change the active channel at any time.
+
+##### Using a Mindwave device
+1. Make sure the MindWave is already paired to your computer's bluetooth and turned on. Also make sure that openBCI software is not running--if it is Glimmer will use this input instead of the Mindwave input
+2. Start Glimmer and click the "load script" button.
+3. Load your script file.
+4. Glimmer will automatically connect to the MindWave and you should see "EEG connected" in a couple of seconds. Your script will start as soon as the Mindwave connects.
+
 
 ### Code
 
@@ -24,4 +43,4 @@ This project is licensed under the Unlicense and is in the public domain (http:/
 ## Acknowledgments
 
 * Jorge Cardoso for developing the Neurosky interface library
-* Kristian Kraljić for work on low-level mouse listeners in Java.
+* Kristian Kraljić for work on low-level mouse listeners in Java.# New Document
