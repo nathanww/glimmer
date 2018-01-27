@@ -1,3 +1,6 @@
+import oscP5.*;
+import netP5.*;
+
 import java.awt.MouseInfo;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager; 
@@ -13,8 +16,11 @@ import com.sun.awt.AWTUtilities;
 import lc.kra.system.mouse.GlobalMouseHook;
 import lc.kra.system.mouse.event.GlobalMouseAdapter;
 import lc.kra.system.mouse.event.GlobalMouseEvent;
+OscP5 receiver; //for getting messages from openBCI
+boolean hasOpenBCI=false; //is an OpenBCI system sending us messages?
+int openBCIPointer=0; //pointer for the buffer
+float[] openBCIBuffer; //put the openBCI data in two-second batches so it is compatible with what we get from neurosky
 GlobalMouseHook mouseHook;
-
 boolean overTaskbar=false;
 int fakeRelease=0; //for some reason generating a mouse click requires multiple calls to Robot and that generates spurious release events. This is a counter of "fake" events.
 
@@ -41,6 +47,7 @@ FFT bufferAnalyzer;
 
 Robot robot;
 MindSet eeg;
+boolean foundNeurosky; //used to indicate when Neurosky port autodetection has worked
 
 PrintWriter logger; //for writing logs from scripts
 boolean visible=true; //is the overlay currently visisble?
@@ -59,6 +66,8 @@ PFont smallfont;
 int mouseCom=millis(); //time mouse has been in the corner (after a certain delay this will bring up the options screen)
 
 String script=""; //contents of user script
+String sessionStore=""; //session store for user script
+
 //booleans for settings screen
 boolean hasScript=false;
 boolean eegFail=false;
@@ -87,6 +96,15 @@ int baselineSample=0;
 
 boolean mouseOverride=false; //if true, make window transparent to let mouse activity pass through.
 
+
+float[] windowSignal(float[] input) { //apply a Hann window to the signal in order to improve the spectrum
+  float[] output=new float[input.length];
+  for (int i=0; i< input.length; i++) {
+    output[i]=input[i]*(float)Math.pow(Math.sin((Math.PI*(i+1))/input.length),2);
+  }
+  return output;
+}
+
 int nextPow2(int number) { //ghetto way of finding powers of 2 for FFT
   int exp=1;
   boolean keepRunning=true;
@@ -99,29 +117,45 @@ int nextPow2(int number) { //ghetto way of finding powers of 2 for FFT
   }
 }
 
+public void rawEvent(int[] sig) { //for OpenBCI our signal is floats, for neurosky it's ints. This lets us handle both without losing precision in the openBCI data
+
+  foundNeurosky=true; //if we are searching for the correct port, let the search loop know we found it
+
+  float[] sig2=new float[sig.length];
+  for (int i=0; i<sig.length;i++) {
+    sig2[i]=(float)sig[i];
+  }
+  try {
+  rawEvent(windowSignal(sig2));
+  }
+  catch (Exception e) {
+    print("Couldn't process sample (this is OK unless it happens a lot)");
+  }
+  
+  
+}
 
 
-
-public void rawEvent(int[] sig) {  //called by the mindset library when a new packet of 512 raw values (1 second) of data is avilable from the Neurosky device.
+public void rawEvent(float[] sig) {  //called by the mindset library when a new packet of 512 raw values (1 second) of data is avilable from the Neurosky device.
   eegConnected=true;
-
-  for (int i=0; i< 512; i++) {
-    lastSample[sampCounter]=sig[i]*((float)baselineLength/(float)sampleLength);
+  
+  for (int i=0; i< sig.length; i++) {
+    lastSample[sampCounter]=sig[i]*((float)baselineLength/(float)sampleLength); //
     sampCounter++;
     if (!continuousBaseline) { //if not a continuous baseline, keep adding to the baseline buffer until it is full
-      if (baselineSample < 512*baselineLength) {
+      if (baselineSample < sig.length*baselineLength) {
         sampleBuffer[baselineSample]=sig[i];
         baselineSample++;
       }
     }
       else { //for a continuous baseline, shift the samples by 1 in the array and add the latest at the end of the buffer.
-    for (int samp=0; samp< (baselineLength*512)-1; samp++) {
+    for (int samp=0; samp< (baselineLength*sig.length)-1; samp++) {
       sampleBuffer[samp]=sampleBuffer[samp+1]; //ineffcient? yes. But it's harder to mess up this way. Not that I didn't manage it at some point.
   }
-  sampleBuffer[(baselineLength*512)-1]=sig[i]; 
+  sampleBuffer[(baselineLength*sig.length)-1]=sig[i]; 
       }
   }
-  if (sampCounter >= (512*sampleLength)) { //we've acquired enough samples, time to process them.
+  if (sampCounter >= (sig.length*sampleLength)) { //we've acquired enough samples, time to process them.
     sampCounter=0;
     //println(lastSample);
     processData(lastSample, sampleBuffer);
@@ -131,8 +165,11 @@ public void rawEvent(int[] sig) {  //called by the mindset library when a new pa
 
 
 void processData(float[] sample, float[] history) {
-
-
+  print(sample.length+",");
+  println();
+  for (int i=0; i < 10; i++) {
+    print(sample[i]+",");
+  }
   sampleAnalyzer.forward(sample);
   bufferAnalyzer.forward(history);
   float[] baselineSpectrum=new float[1000];
@@ -146,7 +183,12 @@ void processData(float[] sample, float[] history) {
    
   }
    println("");
-  lastSample=new float[nextPow2(512*baselineLength)]; //reset the sample buffer.
+   if (hasOpenBCI) {
+  lastSample=new float[nextPow2(200*baselineLength)]; //reset the sample buffer.
+   }
+   else {
+     lastSample=new float[nextPow2(512*baselineLength)]; //reset the sample buffer.
+   }
 
     runScript(baselineSpectrum, sampleSpectrum); //pass the spectra to the script
 }
@@ -158,13 +200,14 @@ void runScript(float[] baseline, float[] sample) { //run a user neuroffedback sc
         try {
         engine.put("lastSample",sample);
         engine.put("baseline",baseline);
+        engine.put("sessionStore",sessionStore);
         engine.put("runTime",millis()-scriptStartTime);
         engine.eval(jsfunctions+script);
         Double amp=(Double)engine.get("amplitude");
         amplitude=(amp.floatValue()*(scriptAmplitude*2));
         Double freq=(Double)engine.get("frequency");
         frequency=freq.floatValue();
-        
+        sessionStore=(String)engine.get("sessionStore");
         try {
          String logData=(String)engine.get("logData");
         logger.println(logData);
@@ -174,7 +217,9 @@ void runScript(float[] baseline, float[] sample) { //run a user neuroffedback sc
         }
         }
         catch (javax.script.ScriptException e) {
+         
           println("Error parsing script");
+          println(e.getMessage());
           hasScript=false;
           scriptError=true;
           eeg.quit();
@@ -186,9 +231,27 @@ void runScript(float[] baseline, float[] sample) { //run a user neuroffedback sc
   
 }
 
+void oscEvent(OscMessage message) { //called when we get an OSC message from OpenBCI
+  hasOpenBCI=true;
+  eegConnected=true;
+  if (hasScript) { //script is running
+    if (openBCIPointer < 200) {
+      openBCIBuffer[openBCIPointer]=message.get(0).floatValue();
+      openBCIPointer++;
+    }
+    else {
+      rawEvent(windowSignal(openBCIBuffer));
+      openBCIPointer=0;
+      openBCIBuffer=new float[200];
+    }
+  }
+}
+
+
 void setup() { 
   size(displayWidth,displayHeight);
   background(200);
+  receiver=new OscP5(this,12345);
 
 //do some black magick to get the flashy thing to work
   frame.removeNotify();
@@ -318,7 +381,7 @@ minim = new Minim(this); //setup minim for ffts later;
 });
 
 leftDown=rightDown=middleDown=false; //reinitialize this in case mouse clicks during intialize got detected
-
+openBCIBuffer=new float[200];
 }
 
 void draw() {
@@ -413,6 +476,11 @@ void draw() {
         fill(0,230,0);
         text("EEG system connected",490,360);
       }
+              if (hasOpenBCI) {
+        textFont(font);
+        fill(255);
+        text("OpenBCI connected\nReading channel 1",490,460);
+      }
       
       if (scriptError) {
         textFont(font);
@@ -465,7 +533,6 @@ oldMouseY=(int)loc.getY();
       background(255);
   float halfWave=((float)1000/frequency)/(float)2;
   if (millis() - lastCycleStart >= halfWave) {
-    
     visible=!visible;
     if ((int)loc.getY()  < displayHeight-40 && millis() > startFlickerTime ) { //make the window go away if mouse is over the taskbar or we just moved it and the "pause if mouse moved" option is on
       overTaskbar=false;
@@ -554,7 +621,9 @@ if (hasScript) {
  if (mouseX >= 480 && mouseX <=480+300 && mouseY >=200 && mouseY <=300) { //load/stop was clicked
      if (hasScript) {
        hasScript=false;
+       if (!hasOpenBCI) {
        eeg.quit();
+       }
      }
      else {
      selectInput("Select the script file", "fileSelected");
@@ -595,6 +664,9 @@ if (hasScript) {
      if (result[line].indexOf("baselineMode=startup") > -1) { //tell the system not to do continuous baselining
       continuousBaseline=false;
     }
+    if (result[line].indexOf("//sessionStore=") > -1) { //initialize the persistent store
+      sessionStore=result[line].substring(result[line].indexOf("//sessionStore=")+15).replace("\n","").replace("\r","");
+    }
   }
   
   if (baselineLength < sampleLength) {
@@ -602,28 +674,43 @@ if (hasScript) {
   }
   boolean worked=false;
   String[] ports=serial.list();
-  for (int port=0; port < ports.length; port++) {
-    try {
-      eeg = new MindSet(this, "COM11");
-      scriptStartTime=millis();
-      worked=true;
-      logger = createWriter("log-"+year()+"-"+month()+"-"+day()+"-"+hour()+"-"+minute()+".txt"); 
-      break;
+  foundNeurosky=false; //reset before searching
+  if (!hasOpenBCI) {
+  for (int port=ports.length-1; port >= 0; port--) {
+      println(ports[port]);
+      eeg = new MindSet(this, ports[port]);
+      long startMillis=millis();
+      while (millis() < startMillis + 3000) { //stall while waiting for a connection
+      }
+      if (foundNeurosky) {
+        worked=true;
+        break;
+      }
       
-    }
-    catch (Exception e) {
-      
-    }
   }
+  }
+  else {
+    worked=true;
+  }
+  scriptStartTime=millis();
+  logger = createWriter("log-"+year()+"-"+month()+"-"+day()+"-"+hour()+"-"+minute()+".txt"); 
   if (!worked) {
     print("Unable to connect to EEG headset");
     eegFail=true;
   }
+  
+  if (hasOpenBCI) { //openBCI has a 200 Hz sampling rate, Neurosky has 512
+  lastSample=new float[nextPow2(200*baselineLength)];
+  sampleBuffer=new float[nextPow2(200*baselineLength)];
+    sampleAnalyzer=new FFT(sampleBuffer.length,200);
+  bufferAnalyzer=new FFT(sampleBuffer.length,200);
+  }
+  else {
   lastSample=new float[nextPow2(512*baselineLength)];
   sampleBuffer=new float[nextPow2(512*baselineLength)];
-  
   sampleAnalyzer=new FFT(sampleBuffer.length,512);
   bufferAnalyzer=new FFT(sampleBuffer.length,512);
+  }
   //sampleAnalyzer.window(FFT.HAMMING);
   //bufferAnalyzer.window(FFT.HAMMING);
   }
@@ -677,11 +764,15 @@ void mouseWheel() {
 void exit() { //clean shutdown
   println("Exiting");
   if (eegConnected) {
+    if (!hasOpenBCI) { //todo:make sure this doesn't break if neorusky gets connected later
   eeg.quit();
+    }
+    if (logger != null) {
    logger.flush();
   logger.close();
+    }
+  
   }
- 
   super.exit();
 }
 
