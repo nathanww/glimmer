@@ -95,7 +95,9 @@ boolean visible=true; //is the overlay currently visisble?
 //frequency and amplitude of oscillation
 float frequency=15;
 float amplitude=0.25f;
-
+int flashRed=255; //flicker colors
+int flashGreen=255;
+int flashBlue=255;
 int lastCycleStart=millis(); //timing for oscillator
 int opMode=1;
 boolean firstRun=true;
@@ -249,6 +251,15 @@ public void runScript(float[] baseline, float[] sample) { //run a user neuroffed
         Double freq=(Double)engine.get("frequency");
         frequency=freq.floatValue();
         sessionStore=(String)engine.get("sessionStore");
+        try {
+          String colorString=(String)engine.get("color");
+          flashRed=Integer.parseInt(colorString.split(",")[0]); 
+          flashGreen=Integer.parseInt(colorString.split(",")[1]);   
+          flashBlue=Integer.parseInt(colorString.split(",")[2]);          
+        }
+        catch (Exception e) {
+          println("No valid color from script");
+        }
         try {
          String logData=(String)engine.get("logData");
         logger.println(logData);
@@ -585,7 +596,7 @@ oldMouseY=(int)loc.getY();
       }
       else {
       frameRate(200);
-      background(255);
+      background(flashRed,flashGreen,flashBlue);
   float halfWave=((float)1000/frequency)/(float)2;
   if (millis() - lastCycleStart >= halfWave) {
     visible=!visible;
@@ -707,6 +718,7 @@ if (hasScript) {
     baselineLength=16;
     continuousBaseline=true;
     baselineSample=0;
+    flashRed=flashGreen=flashBlue=255; //set default flash color
     String[] result=loadStrings(selection.getAbsolutePath());
     script="";
     for (int i=0; i<result.length; i++) {
